@@ -1,5 +1,5 @@
 {
-  "name": "linkedincli",
+  "name": "@bcharleson/linkedincli",
   "version": "0.1.0",
   "description": "CLI and MCP server for LinkedIn — 43 commands for profiles, posts, messaging, connections, search, feed, and more. Cookie session auth, AI agent native.",
   "type": "module",
