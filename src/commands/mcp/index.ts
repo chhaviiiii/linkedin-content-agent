@@ -13,7 +13,7 @@ Configuration for Claude Code / Cursor / Windsurf:
     "mcpServers": {
       "linkedin": {
         "command": "npx",
-        "args": ["-y", "linkedin-cli", "mcp"],
+        "args": ["-y", "@bcharleson/linkedincli", "mcp"],
         "env": {
           "LINKEDIN_LI_AT": "your_li_at_cookie",
           "LINKEDIN_JSESSIONID": "your_jsessionid_cookie"

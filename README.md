@@ -4,8 +4,14 @@ Full LinkedIn platform management from your terminal. 43 commands for profiles, 
 
 Works as a **CLI** and an **MCP server** (for Claude Code, Cursor, Windsurf, and other AI agents).
 
-```
-npm install -g linkedincli
+## Install
+
+```bash
+# Install globally
+npm install -g @bcharleson/linkedincli
+
+# Or run without installing
+npx @bcharleson/linkedincli --help
 ```
 
 ## Quick Start
@@ -209,7 +215,7 @@ Or if using `npx`:
   "mcpServers": {
     "linkedin": {
       "command": "npx",
-      "args": ["-y", "linkedincli", "mcp"]
+      "args": ["-y", "@bcharleson/linkedincli", "mcp"]
     }
   }
 }
