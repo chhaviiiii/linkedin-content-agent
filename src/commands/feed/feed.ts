@@ -54,12 +54,27 @@ export const feedUserCommand: CommandDefinition = {
   },
 
   handler: async (input, client) => {
-    return client.get('/feed/updates', {
-      profileId: input.profile_id,
-      q: 'memberShareFeed',
-      moduleKey: 'member-share',
+    const profile = await client.get<any>(
+      `/identity/profiles/${encodeURIComponent(input.profile_id)}/profileView`,
+    );
+    let profileUrn: string | undefined;
+    for (const item of profile?.included ?? []) {
+      const urn = item?.dashEntityUrn ?? item?.entityUrn;
+      if (typeof urn === 'string' && urn.includes('fsd_profile')) {
+        profileUrn = urn.startsWith('urn:') ? urn : `urn:li:fsd_profile:${urn}`;
+        break;
+      }
+    }
+    if (!profileUrn) {
+      throw new Error(`Could not resolve profile URN for ${input.profile_id}`);
+    }
+    return client.get('/identity/profileUpdatesV2', {
       count: input.limit,
       start: input.start,
+      q: 'memberShareFeed',
+      moduleKey: 'member-shares:phone',
+      includeLongTermHistory: true,
+      profileUrn,
     });
   },
 };

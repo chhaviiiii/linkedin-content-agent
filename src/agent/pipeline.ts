@@ -8,6 +8,7 @@ import { buildCarousel, buildVideoScript, mediaNotes } from './media-builder.js'
 import { saveDraft, generateDraftId } from './drafts.js';
 import { generateCarouselImages, generateCoverOnly } from './image-generator.js';
 import { attachUserPhoto, buildImageIdea } from './image-ideas.js';
+import { loadVoiceProfile, applyVoice } from './voice.js';
 import type { ContentDraft, EngagementGoal, PostFormat } from './types.js';
 
 export interface PipelineOptions {
@@ -20,6 +21,7 @@ export interface PipelineOptions {
   text?: string;
   format?: PostFormat;
   photo?: string;
+  voice_username?: string;
   client?: LinkedInClient;
   skip_images?: boolean;
 }
@@ -89,7 +91,15 @@ export async function runPipeline(options: PipelineOptions = {}): Promise<Pipeli
   }
 
   const isToolkitTemplate = !options.text && topic.title.toLowerCase().includes('ai content');
-  const humanizedText = isToolkitTemplate ? rawText : humanize(rawText).text;
+  let humanizedText = isToolkitTemplate ? rawText : humanize(rawText).text;
+
+  const voice = options.voice_username
+    ? await loadVoiceProfile(options.voice_username)
+    : await loadVoiceProfile();
+  if (voice) {
+    humanizedText = applyVoice(humanizedText, voice);
+  }
+
   const audit = auditPost(humanizedText);
 
   const carousel = buildCarousel(humanizedText, topic, goal);

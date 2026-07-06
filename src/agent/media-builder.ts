@@ -1,15 +1,25 @@
 import type { CarouselSlide, EngagementGoal, PostFormat, TrendTopic, VideoScript } from './types.js';
 
+const MAX_HEADLINE_WORDS = 6;
+const MAX_BODY_WORDS = 10;
+const MAX_LIST_ITEM_WORDS = 8;
+
 const CTA_PATTERNS = /comment|🔥|save this|swipe|building in public|drop a|early access|your move/i;
 
 function defaultCta(goal: EngagementGoal): string {
   const ctas: Record<EngagementGoal, string> = {
-    comments: 'Drop your take in the comments.',
-    saves: 'Save this for your next draft.',
-    reach: 'Share with someone who needs this.',
-    profile_visits: 'Follow for more breakdowns.',
+    comments: 'Drop your take below',
+    saves: 'Save for your next draft',
+    reach: 'Share with your network',
+    profile_visits: 'Follow for more',
   };
   return ctas[goal];
+}
+
+function clipWords(text: string, max: number): string {
+  const words = text.replace(/[→•—–]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (words.length <= max) return words.join(' ');
+  return `${words.slice(0, max).join(' ')}…`;
 }
 
 function extractStat(text: string): string | undefined {
@@ -31,19 +41,209 @@ function parseBullets(lines: string[]): Array<{ headline: string; body: string }
     if (!line.startsWith('→')) continue;
     const named = line.match(/^→\s*([^:]+):\s*(.+)$/);
     if (named) {
-      bullets.push({ headline: named[1]!.trim(), body: named[2]!.trim() });
+      bullets.push({
+        headline: clipWords(named[1]!.trim(), MAX_HEADLINE_WORDS),
+        body: clipWords(named[2]!.trim(), MAX_BODY_WORDS),
+      });
       continue;
     }
     const simple = line.match(/^→\s*(.+)$/);
-    if (simple) bullets.push({ headline: simple[1]!.trim(), body: '' });
+    if (simple) {
+      const raw = simple[1]!.trim();
+      const dot = raw.indexOf(':');
+      if (dot > 0 && dot < 40) {
+        bullets.push({
+          headline: clipWords(raw.slice(0, dot), MAX_HEADLINE_WORDS),
+          body: clipWords(raw.slice(dot + 1), MAX_BODY_WORDS),
+        });
+      } else {
+        bullets.push({ headline: clipWords(raw, MAX_HEADLINE_WORDS), body: '' });
+      }
+    }
   }
   return bullets;
 }
 
-function contentParagraphs(lines: string[], skip: Set<string>): string[] {
-  return lines.filter((l) => !skip.has(l) && !l.startsWith('→') && l.length > 30);
+function topicInsights(topic: TrendTopic): string[] {
+  const t = topic.title.toLowerCase();
+  if (t.includes('carousel')) {
+    return ['One carousel beats 5 text posts', 'Hook · stat · steps · CTA', '1080×1080 PDF upload', 'Repurpose to IG + TikTok'];
+  }
+  if (t.includes('em dash') || t.includes('ai tell') || t.includes('ai content')) {
+    return ['Kill em dashes on sight', 'Drop leverage & delve', 'Read out loud first', 'Sound human, not corporate'];
+  }
+  if (t.includes('hook') || t.includes('tiktok')) {
+    return ['First line = 80% of post', 'Steal structure, not sentences', 'Test 3 hooks, pick one', 'TikTok hooks work on LinkedIn'];
+  }
+  if (t.includes('authentic')) {
+    return ['Imperfect beats polished', 'Stories beat generic advice', 'AI draft OK, generic publish not', 'Your angle is the moat'];
+  }
+  return [
+    clipWords(`Lead with ${topic.keywords[0] ?? 'clarity'}`, MAX_LIST_ITEM_WORDS),
+    'One specific number wins',
+    'One idea per post',
+    'End with a clear ask',
+  ];
 }
 
+function isToolkitPost(text: string, topic: TrendTopic): boolean {
+  return topic.title.toLowerCase().includes('ai content') || /438,?413/.test(text);
+}
+
+function buildToolkitCarousel(goal: EngagementGoal, text: string): CarouselSlide[] {
+  const ctaLine = text.split('\n').reverse().find((l) => CTA_PATTERNS.test(l));
+  const tools = [
+    { headline: 'Post Writer', body: '16 hooks · pick your goal', stat: '01' },
+    { headline: 'Post Audit', body: 'Algo score before publish', stat: '02' },
+    { headline: 'Humanizer', body: 'Strip AI filler words', stat: '03' },
+    { headline: 'Hook Extractor', body: 'Reverse-engineer viral posts', stat: '04' },
+  ];
+
+  const slides: CarouselSlide[] = [
+    {
+      slide: 0,
+      kind: 'cover',
+      headline: 'AI posts get 57% fewer likes',
+      body: 'Swipe for the fix →',
+      badge: '2026 DATA',
+      stat: '57%',
+    },
+    {
+      slide: 0,
+      kind: 'stat',
+      headline: 'The problem',
+      body: 'Readers spot AI in line one',
+      stat: '57%',
+    },
+    {
+      slide: 0,
+      kind: 'steps',
+      headline: '4-tool pipeline',
+      body: 'Before every publish',
+      items: tools.map((t) => t.headline),
+    },
+    ...tools.map((t) => ({
+      slide: 0,
+      kind: 'point' as const,
+      headline: t.headline,
+      body: t.body,
+      stat: t.stat,
+    })),
+    {
+      slide: 0,
+      kind: 'cta',
+      headline: 'Your move',
+      body: ctaLine ? clipWords(ctaLine.replace(/🔥/g, '').trim(), MAX_BODY_WORDS) : defaultCta(goal),
+    },
+  ];
+
+  return slides.map((s, i) => ({ ...s, slide: i + 1 }));
+}
+
+function buildTopicCarousel(topic: TrendTopic, goal: EngagementGoal, text: string): CarouselSlide[] {
+  const insights = topicInsights(topic).map((i) => clipWords(i, MAX_LIST_ITEM_WORDS));
+  const stat = extractStat(text) ?? extractStat(topic.title);
+  const ctaLine = text.split('\n').reverse().find((l) => CTA_PATTERNS.test(l));
+
+  const coverHook = stat
+    ? `${stat} on ${clipWords(topic.title.toLowerCase(), 3)}`
+    : clipWords(topic.title, MAX_HEADLINE_WORDS);
+
+  const slides: CarouselSlide[] = [
+    {
+      slide: 0,
+      kind: 'cover',
+      headline: coverHook,
+      body: 'Swipe →',
+      badge: topic.platform === 'linkedin' ? 'LINKEDIN 2026' : topic.platform.toUpperCase(),
+      stat,
+    },
+    {
+      slide: 0,
+      kind: stat ? 'stat' : 'problem',
+      headline: stat ? 'The data' : 'The gap',
+      body: clipWords(topic.angle, MAX_BODY_WORDS),
+      stat: stat ?? '—',
+    },
+    {
+      slide: 0,
+      kind: 'list',
+      headline: 'What works',
+      body: '',
+      items: insights.slice(0, 4),
+    },
+    {
+      slide: 0,
+      kind: 'steps',
+      headline: 'The playbook',
+      body: clipWords(topic.angle, MAX_BODY_WORDS),
+      items: insights.slice(0, 3),
+    },
+    {
+      slide: 0,
+      kind: 'cta',
+      headline: 'Your move',
+      body: ctaLine ? clipWords(ctaLine.replace(/🔥/g, '').trim(), MAX_BODY_WORDS) : defaultCta(goal),
+    },
+  ];
+
+  return slides.map((s, i) => ({ ...s, slide: i + 1 }));
+}
+
+function buildBulletCarousel(
+  bullets: Array<{ headline: string; body: string }>,
+  topic: TrendTopic,
+  goal: EngagementGoal,
+  text: string,
+): CarouselSlide[] {
+  const stat = extractStat(text) ?? extractStat(topic.title);
+  const ctaLine = text.split('\n').reverse().find((l) => CTA_PATTERNS.test(l));
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const hook = lines.find((l) => !l.startsWith('→') && !CTA_PATTERNS.test(l) && l.length >= 15);
+
+  const slides: CarouselSlide[] = [
+    {
+      slide: 0,
+      kind: 'cover',
+      headline: stat ? `${stat} fewer likes` : clipWords(hook ?? topic.title, MAX_HEADLINE_WORDS),
+      body: 'Swipe →',
+      badge: 'BREAKDOWN',
+      stat,
+    },
+    {
+      slide: 0,
+      kind: stat ? 'stat' : 'problem',
+      headline: 'Why it matters',
+      body: clipWords(topic.angle, MAX_BODY_WORDS),
+      stat: stat ?? '—',
+    },
+    ...bullets.slice(0, 4).map((b) => ({
+      slide: 0,
+      kind: 'point' as const,
+      headline: b.headline,
+      body: b.body,
+    })),
+    {
+      slide: 0,
+      kind: 'cta',
+      headline: 'Your move',
+      body: ctaLine ? clipWords(ctaLine.replace(/🔥/g, '').trim(), MAX_BODY_WORDS) : defaultCta(goal),
+    },
+  ];
+
+  while (slides.length < 5) {
+    slides.splice(slides.length - 1, 0, {
+      slide: 0,
+      kind: 'point',
+      headline: clipWords(topic.title, MAX_HEADLINE_WORDS),
+      body: clipWords(topic.angle, MAX_BODY_WORDS),
+    });
+  }
+
+  return slides.slice(0, 7).map((s, i) => ({ ...s, slide: i + 1 }));
+}
+
+/** Build slide-native carousel copy — visual summary, not the post pasted on slides. */
 export function buildCarousel(
   humanizedText: string,
   topic: TrendTopic,
@@ -51,84 +251,16 @@ export function buildCarousel(
 ): CarouselSlide[] {
   const lines = humanizedText.split('\n').map((l) => l.trim()).filter(Boolean);
   const bullets = parseBullets(lines);
-  const ctaLine = [...lines].reverse().find((l) => CTA_PATTERNS.test(l));
 
-  const hookCandidates = lines.filter(
-    (l) => !l.startsWith('→') && !CTA_PATTERNS.test(l) && l.length >= 15,
-  );
-  const hook = hookCandidates[0] ?? topic.title;
-  const coverHeadline = hook.length > 65 ? topic.title : hook;
-
-  const problemLine =
-    lines.find((l) => /%|killer|myth|unpopular|nobody|fewer|behind/i.test(l)) ??
-    lines[1] ??
-    topic.angle;
-  const problemStat = extractStat(problemLine) ?? extractStat(topic.title) ?? extractStat(lines.join(' '));
-
-  const skip = new Set([hookCandidates[0], problemLine, ctaLine].filter(Boolean) as string[]);
-  const paragraphs = contentParagraphs(lines, skip);
-
-  const slides: CarouselSlide[] = [
-    {
-      slide: 0,
-      kind: 'cover',
-      headline: coverHeadline,
-      body: 'Swipe →',
-      badge: topic.platform === 'linkedin' ? 'LINKEDIN 2026' : topic.platform.toUpperCase(),
-    },
-    {
-      slide: 0,
-      kind: 'problem',
-      headline: 'The problem',
-      body: problemLine,
-      stat: problemStat,
-    },
-  ];
-
-  if (bullets.length > 0) {
-    for (const b of bullets.slice(0, 4)) {
-      slides.push({
-        slide: 0,
-        kind: 'point',
-        headline: b.headline,
-        body: b.body || topic.angle,
-      });
-    }
-  } else {
-    for (const para of paragraphs.slice(0, 4)) {
-      const dot = para.indexOf('. ');
-      const headline = dot > 10 && dot < 80 ? para.slice(0, dot + 1) : para.slice(0, 60);
-      const body = dot > 10 ? para.slice(dot + 2) : '';
-      slides.push({
-        slide: 0,
-        kind: 'point',
-        headline,
-        body: body || topic.angle,
-      });
-    }
+  if (isToolkitPost(humanizedText, topic)) {
+    return buildToolkitCarousel(goal, humanizedText);
   }
 
-  // Pad to at least 5 content slides before CTA (cover + problem + 3 points minimum)
-  while (slides.length < 5) {
-    slides.push({
-      slide: 0,
-      kind: 'point',
-      headline: topic.title,
-      body: topic.angle,
-    });
+  if (bullets.length >= 3) {
+    return buildBulletCarousel(bullets, topic, goal, humanizedText);
   }
 
-  slides.push({
-    slide: 0,
-    kind: 'cta',
-    headline: 'Your move',
-    body: ctaLine ?? defaultCta(goal),
-  });
-
-  // Cap at 7 slides total
-  const trimmed = [slides[0]!, slides[1]!, ...slides.slice(2, -1).slice(0, 4), slides.at(-1)!];
-
-  return trimmed.map((s, i) => ({ ...s, slide: i + 1 }));
+  return buildTopicCarousel(topic, goal, humanizedText);
 }
 
 /** @deprecated use buildCarousel */
@@ -146,18 +278,18 @@ export function buildVideoScript(topic: TrendTopic, humanizedText: string): Vide
 
   return {
     duration_sec: 30,
-    hook: firstSentence,
+    hook: clipWords(firstSentence, 12),
     scenes: [
-      { start: 0, end: 3, text: firstSentence, visual: 'Bold hook on screen' },
-      { start: 3, end: 12, text: topic.angle, visual: 'B-roll or screen recording' },
+      { start: 0, end: 3, text: clipWords(firstSentence, 8), visual: 'Bold hook on screen' },
+      { start: 3, end: 12, text: clipWords(topic.angle, 10), visual: 'B-roll or screen recording' },
       {
         start: 12,
         end: 22,
-        text: bullets.map((b) => b.headline).slice(0, 4).join(' · ') || topic.title,
+        text: bullets.map((b) => b.headline).slice(0, 4).join(' · ') || clipWords(topic.title, 6),
         visual: 'Quick-cut text cards',
       },
-      { start: 22, end: 27, text: 'Save this before you post next.', visual: 'CTA card' },
-      { start: 27, end: 30, text: 'Follow for more.', visual: 'End card' },
+      { start: 22, end: 27, text: 'Save this before you post', visual: 'CTA card' },
+      { start: 27, end: 30, text: 'Follow for more', visual: 'End card' },
     ],
     cta: 'Save this',
   };
@@ -179,6 +311,7 @@ export function mediaNotes(format: PostFormat = 'carousel'): string[] {
     ];
   }
   return [
+    'Carousel slides are a visual summary — post body has the full story',
     'Combine slide PNGs into a PDF (1080×1080) for LinkedIn document posts',
     'Or post text + cover.png for a lighter version',
     'Regenerate: linkedin agent images --id <draft-id>',

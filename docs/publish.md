@@ -9,8 +9,10 @@ Get cookies from browser DevTools → Application → Cookies → `linkedin.com`
 - `li_at`
 - `JSESSIONID`
 
+> **Browser logout:** LinkedIn invalidates your browser session when cookies are used here. Use login **only** to publish. For drafting and voice, skip login entirely.
+
 ```bash
-linkedin login
+linkedin login   # no API call by default — use --verify only if needed
 ```
 
 > Using cookies in the CLI may log you out of your browser. Copy fresh cookies when needed.

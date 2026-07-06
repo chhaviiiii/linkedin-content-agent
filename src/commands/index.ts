@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import type { CommandDefinition, GlobalOptions, LinkedInClient } from '../core/types.js';
 import { resolveAuth } from '../core/auth.js';
-import { createClient } from '../core/client.js';
+import { createSessionClient } from '../core/session.js';
 import { output, outputError } from '../core/output.js';
 import { registerLoginCommand, registerLogoutCommand, registerStatusCommand } from './auth/login.js';
 import { registerMcpCommand } from './mcp/index.js';
@@ -105,7 +105,7 @@ function registerCommand(parent: Command, cmdDef: CommandDefinition): void {
         liAt: globalOpts.liAt,
         jsessionid: globalOpts.jsessionid,
       });
-      const client = createClient(auth);
+      const { client } = await createSessionClient(auth);
 
       // Build input from positional args + options
       const input: Record<string, any> = {};

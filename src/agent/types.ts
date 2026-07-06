@@ -36,9 +36,10 @@ export interface CarouselSlide {
   slide: number;
   headline: string;
   body: string;
-  kind?: 'cover' | 'problem' | 'point' | 'cta';
+  kind?: 'cover' | 'problem' | 'point' | 'cta' | 'list' | 'steps' | 'stat';
   stat?: string;
   badge?: string;
+  items?: string[];
 }
 
 export interface VideoScript {

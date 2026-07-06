@@ -1,4 +1,4 @@
-import type { LinkedInAuth, LinkedInClient } from './types.js';
+import type { LinkedInAuth, LinkedInClient, ClientOptions } from './types.js';
 import {
   AuthError,
   ChallengeError,
@@ -29,7 +29,7 @@ export function generateTrackingId(): string {
   return Buffer.from(bytes).toString('base64');
 }
 
-export function createClient(auth: LinkedInAuth): LinkedInClient {
+export function createClient(auth: LinkedInAuth, options?: ClientOptions): LinkedInClient {
   const csrfToken = auth.jsessionid.replace(/"/g, '');
 
   const baseHeaders: Record<string, string> = {
@@ -41,6 +41,10 @@ export function createClient(auth: LinkedInAuth): LinkedInClient {
     'accept-language': 'en-US,en;q=0.9',
     'x-li-lang': 'en_US',
     'x-restli-protocol-version': '2.0.0',
+    referer: 'https://www.linkedin.com/feed/',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
     'x-li-track': JSON.stringify({
       clientVersion: '1.13.21',
       osName: 'web',
@@ -51,6 +55,17 @@ export function createClient(auth: LinkedInAuth): LinkedInClient {
   };
 
   let lastRequestTime = 0;
+
+  function maybeUpdateAuth(response: Response): void {
+    const setCookie = response.headers.get('set-cookie');
+    if (!setCookie || !options?.onAuthUpdate) return;
+    const jsession = setCookie.match(/JSESSIONID="?([^";\s]+)"?/i);
+    const liat = setCookie.match(/(?:^|,\s*)li_at=([^;\s]+)/i);
+    const patch: Partial<LinkedInAuth> = {};
+    if (jsession?.[1]) patch.jsessionid = jsession[1].replace(/^"|"$/g, '');
+    if (liat?.[1]) patch.liAt = liat[1];
+    if (Object.keys(patch).length > 0) options.onAuthUpdate(patch);
+  }
 
   async function request<T = unknown>(options: {
     method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
@@ -107,6 +122,7 @@ export function createClient(auth: LinkedInAuth): LinkedInClient {
 
         clearTimeout(timeout);
         lastRequestTime = Date.now();
+        maybeUpdateAuth(response);
 
         // Check for challenge / restricted page (only on non-OK responses)
         const contentType = response.headers.get('content-type') ?? '';
@@ -194,8 +210,33 @@ export function createClient(auth: LinkedInAuth): LinkedInClient {
     throw lastError ?? new LinkedInError('Request failed after retries', 'MAX_RETRIES');
   }
 
+  async function fetchPage(path: string): Promise<string> {
+    const csrfToken = auth.jsessionid.replace(/"/g, '');
+    const url = `${LINKEDIN_BASE}${path.startsWith('/') ? path : `/${path}`}`;
+    const response = await fetch(url, {
+      headers: {
+        'csrf-token': csrfToken,
+        cookie: `JSESSIONID="${csrfToken}"; li_at=${auth.liAt}`,
+        'user-agent': baseHeaders['user-agent']!,
+        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'accept-language': 'en-US,en;q=0.9',
+      },
+      redirect: 'follow',
+    });
+    const html = await response.text();
+    maybeUpdateAuth(response);
+    if (response.status === 401 || html.includes('authwall')) {
+      throw new AuthError('Session expired or invalid. Run: linkedin login');
+    }
+    if (!response.ok) {
+      throw new LinkedInError(`Failed to load page: ${response.status}`, 'PAGE_ERROR', response.status);
+    }
+    return html;
+  }
+
   return {
     request,
+    fetchPage,
     get: <T = unknown>(path: string, query?: Record<string, any>) =>
       request<T>({ method: 'GET', path, query }),
     post: <T = unknown>(path: string, body?: unknown, query?: Record<string, any>) =>

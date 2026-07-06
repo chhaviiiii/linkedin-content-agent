@@ -1,0 +1,17 @@
+# Voice samples — paste profile text from your LinkedIn URL (not post feed)
+#
+# 1. Open linkedin.com/in/YOUR_USERNAME in your browser
+# 2. Copy About + a few experience bullets (separate blocks with ---)
+# 3. Save as my-posts.txt and run:
+#    linkedin agent voice --url https://linkedin.com/in/YOUR_USERNAME --from-file ./my-posts.txt
+#
+# Or try auto-fetch first (works on some networks):
+#    linkedin agent voice --url https://linkedin.com/in/YOUR_USERNAME
+
+Paste your About section here. One paragraph is enough.
+
+---
+
+→ First experience bullet from your profile
+→ Second bullet
+→ Third bullet

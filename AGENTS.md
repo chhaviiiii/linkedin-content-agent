@@ -20,13 +20,46 @@ This repo is a **LinkedIn content agent** + optional LinkedIn CLI. Your job as a
 5. User approves → linkedin posts create ...         # only if user asks
 ```
 
+## MCP tools (no login required)
+
+When running `linkedin mcp`, these tools are always available:
+
+| Tool | Description |
+|------|-------------|
+| `agent_run` | Create a draft (never publishes) |
+| `agent_plan_week` | Plan 7 days (`create: true` to generate all) |
+| `agent_voice_scan` | Learn voice from username or file |
+| `agent_voice_active` | Get active voice profile |
+| `agent_drafts` | List drafts |
+| `agent_show` | Show draft by ID |
+| `agent_audit` | Score post text |
+| `agent_humanize` | Strip AI tells |
+| `agent_scout` | Trend topics |
+
+LinkedIn API tools (`profile_*`, `posts_*`, etc.) load only if `linkedin login` cookies are set.
+
+## Voice workflow
+
+```bash
+# Try profile URL (no login)
+linkedin agent voice --url https://linkedin.com/in/YOUR_USERNAME
+
+# If LinkedIn blocks the fetch (authwall), paste About into my-posts.txt:
+cp my-posts.example.txt my-posts.txt
+# edit my-posts.txt, then:
+linkedin agent voice --url https://linkedin.com/in/YOUR_USERNAME --from-file ./my-posts.txt
+```
+
+Voice profiles save to `~/.linkedin-cli/voice/<username>.json`. Use `--voice YOUR_USERNAME` on `agent run` and `agent plan`.
+
 ## Content agent commands
 
 Run from repo root after `npm run build`:
 
 ```bash
-node dist/index.js agent run [options]
-node dist/index.js agent scout [options]
+node dist/index.js agent plan --niche "SWE intern" --create --pretty
+node dist/index.js agent voice --url https://linkedin.com/in/YOUR_USERNAME --from-file ./my-posts.txt
+node dist/index.js agent run --topic "test" --pretty
 node dist/index.js agent humanize --text "..."
 node dist/index.js agent audit --text "..." | --file path
 node dist/index.js agent extract-hook --text "..."
@@ -118,7 +151,7 @@ npm run dev -- agent run --topic "test" --pretty
 src/agent/          # Content agent (single source of truth for drafting)
 src/commands/agent/ # CLI registration
 src/commands/       # LinkedIn API command groups
-src/mcp/            # MCP server (LinkedIn API tools only)
+src/mcp/            # MCP server (agent tools + optional LinkedIn API tools)
 ```
 
 Adding agent features: edit `src/agent/`, register CLI in `src/commands/agent/index.ts`.

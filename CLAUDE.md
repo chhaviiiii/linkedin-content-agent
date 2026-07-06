@@ -13,7 +13,7 @@ src/commands/agent/ # CLI: linkedin agent run|scout|audit|...
 
 ```
 src/commands/       # profile, posts, feed, messaging, etc.
-src/mcp/            # MCP server (API tools only)
+src/mcp/            # MCP server (agent tools + optional LinkedIn API tools)
 src/core/           # HTTP client, auth, config
 ```
 

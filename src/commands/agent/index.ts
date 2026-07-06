@@ -12,14 +12,22 @@ import { HOOK_FORMULAS } from '../../agent/hook-formulas.js';
 import { regenerateImagesForDraft, generateCoverOnly } from '../../agent/image-generator.js';
 import { buildCarousel } from '../../agent/media-builder.js';
 import { attachUserPhoto, buildImageIdea } from '../../agent/image-ideas.js';
+import { scanVoiceFromUsername, scanVoiceFromFile, saveVoiceProfile, exportVoiceSamplesToFile, parseLinkedInProfileId } from '../../agent/voice.js';
+import { planWeek } from '../../agent/week-planner.js';
 import type { EngagementGoal, Platform, PostFormat } from '../../agent/types.js';
 
-function liveClient(globalOpts: GlobalOptions, useLive: boolean) {
-  if (!useLive) return Promise.resolve(undefined);
-  return import('../../core/auth.js')
-    .then(({ resolveAuth }) => resolveAuth({ liAt: globalOpts.liAt, jsessionid: globalOpts.jsessionid }))
-    .then((auth) => import('../../core/client.js').then(({ createClient }) => createClient(auth)))
-    .catch(() => undefined);
+async function optionalClient(globalOpts: GlobalOptions) {
+  try {
+    const auth = await (await import('../../core/auth.js')).resolveAuth({
+      liAt: globalOpts.liAt,
+      jsessionid: globalOpts.jsessionid,
+    });
+    const { createSessionClient } = await import('../../core/session.js');
+    const { client } = await createSessionClient(auth);
+    return client;
+  } catch {
+    return undefined;
+  }
 }
 
 export function registerAgentCommands(program: Command): void {
@@ -41,6 +49,7 @@ export function registerAgentCommands(program: Command): void {
     .option('--no-images', 'Skip PNG generation')
     .option('--format <format>', 'Post format: carousel, single, text, or auto (default: auto)')
     .option('--photo <path>', 'Attach your own photo (best for personal posts)')
+    .option('--voice <username>', 'Apply saved voice profile for this username')
     .option('--live', 'Opt in to live LinkedIn trend search (requires login)')
     .action(async function (this: Command) {
       const opts = this.opts() as Record<string, string | number | boolean | undefined>;
@@ -56,7 +65,7 @@ export function registerAgentCommands(program: Command): void {
           ? formatOpt as PostFormat
           : undefined;
 
-        const client = await liveClient(globalOpts, Boolean(opts.live));
+        const client = await optionalClient(globalOpts);
         const result = await runPipeline({
           goal: (opts.goal as EngagementGoal) ?? 'saves',
           topic: opts.topic as string | undefined,
@@ -67,7 +76,8 @@ export function registerAgentCommands(program: Command): void {
           text,
           format,
           photo: opts.photo as string | undefined,
-          client,
+          voice_username: opts.voice as string | undefined,
+          client: opts.live ? client : undefined,
           skip_images: opts.noImages as boolean | undefined,
         });
         output({
@@ -104,7 +114,7 @@ export function registerAgentCommands(program: Command): void {
       const opts = this.opts() as Record<string, string | number | boolean | undefined>;
       const globalOpts = this.optsWithGlobals() as GlobalOptions;
       try {
-        const client = await liveClient(globalOpts, Boolean(opts.live));
+        const client = await optionalClient(globalOpts);
         const topics = await scoutTrends(
           {
             keywords: opts.keywords as string | undefined,
@@ -112,7 +122,7 @@ export function registerAgentCommands(program: Command): void {
             niche: opts.niche as string | undefined,
             limit: (opts.limit as number) ?? 5,
           },
-          client,
+          opts.live ? client : undefined,
         );
         output({ topics }, globalOpts);
       } catch (error) {
@@ -164,6 +174,88 @@ export function registerAgentCommands(program: Command): void {
       const globalOpts = this.optsWithGlobals() as GlobalOptions;
       try {
         output(extractHook(opts.text), globalOpts);
+      } catch (error) {
+        outputError(error, globalOpts);
+      }
+    });
+
+  agent
+    .command('plan')
+    .description('Plan a week of posts (add --create to generate all drafts)')
+    .option('--niche <niche>', 'Your niche (e.g. "SWE intern ML")')
+    .option('-k, --keywords <keywords>', 'Keywords for topic scouting')
+    .option('--voice <username>', 'Apply voice profile to all drafts')
+    .option('--create', 'Generate all 7 drafts (not just the plan)')
+    .action(async function (this: Command) {
+      const opts = this.opts() as Record<string, string | boolean | undefined>;
+      const globalOpts = this.optsWithGlobals() as GlobalOptions;
+      try {
+        const client = await optionalClient(globalOpts);
+        const plan = await planWeek({
+          niche: opts.niche as string | undefined,
+          keywords: opts.keywords as string | undefined,
+          create: Boolean(opts.create),
+          voice_username: opts.voice as string | undefined,
+          client,
+        });
+        output(plan, globalOpts);
+      } catch (error) {
+        outputError(error, globalOpts);
+      }
+    });
+
+  agent
+    .command('voice')
+    .description('Learn writing voice from a LinkedIn profile URL (no login)')
+    .option('-u, --username <id>', 'LinkedIn public ID or full profile URL')
+    .option('--url <url>', 'Profile URL (e.g. https://linkedin.com/in/cnayyar)')
+    .option('--from-profile <id>', 'Alias for --username / profile URL')
+    .option('--with-posts', 'Optional: fetch post feed (requires login — usually not needed)')
+    .option('-f, --from-file <path>', 'Use pasted profile text or posts (no fetch)')
+    .option('--save-to <path>', 'Save samples to file (default: ./my-posts.txt)')
+    .action(async function (this: Command) {
+      const opts = this.opts() as {
+        username?: string;
+        url?: string;
+        fromProfile?: string;
+        fromFile?: string;
+        saveTo?: string;
+        withPosts?: boolean;
+      };
+      const globalOpts = this.optsWithGlobals() as GlobalOptions;
+      const profileInput = opts.url ?? opts.username ?? opts.fromProfile;
+      if (!profileInput) {
+        outputError(
+          new Error('Pass a profile URL or username:\n  linkedin agent voice --url https://linkedin.com/in/cnayyar'),
+          globalOpts,
+        );
+        return;
+      }
+      try {
+        if (opts.fromFile) {
+          const username = parseLinkedInProfileId(profileInput);
+          const profile = await scanVoiceFromFile(username, opts.fromFile);
+          const path = await saveVoiceProfile(profile);
+          output({ message: 'Voice profile saved from file', path, profile }, globalOpts);
+          return;
+        }
+
+        const client = opts.withPosts ? await optionalClient(globalOpts) : undefined;
+        const profile = await scanVoiceFromUsername(profileInput, client, { withPosts: opts.withPosts });
+        const saveTo = opts.saveTo ?? './my-posts.txt';
+        await exportVoiceSamplesToFile(profile.username, profile.samples, saveTo, profile.source);
+        const path = await saveVoiceProfile(profile);
+        output({
+          message: 'Voice profile saved from profile URL (no login)',
+          url: `https://www.linkedin.com/in/${profile.username}/`,
+          source: profile.source,
+          from_url: ['about', 'headline', 'experience bullets', 'projects'],
+          not_from_url: ['post feed', 'activity page posts'],
+          samples: profile.samples.length,
+          saved_to: saveTo,
+          path,
+          profile,
+        }, globalOpts);
       } catch (error) {
         outputError(error, globalOpts);
       }

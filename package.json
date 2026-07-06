@@ -10,6 +10,7 @@
     "dist/",
     "README.md",
     "AGENTS.md",
+    "my-posts.example.txt",
     "docs/",
     "LICENSE"
   ],
@@ -33,7 +34,6 @@
     "url": "https://github.com/chhaviiiii/linkedin-content-agent/issues"
   },
   "dependencies": {
-    "@inquirer/prompts": "^8.3.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "commander": "^14.0.3",
     "sharp": "^0.35.3",

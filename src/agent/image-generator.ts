@@ -67,6 +67,85 @@ function resolveKind(slide: CarouselSlide, total: number): string {
   return 'point';
 }
 
+function listItemRow(y: number, index: number, text: string, p: Palette): string {
+  const label = escapeXml(text);
+  return `
+  <rect x="${PAD}" y="${y}" width="48" height="48" rx="12" fill="${p.primary}" opacity="0.15"/>
+  <text x="${PAD + 24}" y="${y + 32}" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${p.primary}" font-weight="700">${index + 1}</text>
+  <text x="${PAD + 68}" y="${y + 32}" font-family="${FONT}" font-size="30" fill="#1e293b" font-weight="600">${label}</text>`;
+}
+
+function listSlide(slide: CarouselSlide, total: number, p: Palette): string {
+  const items = slide.items ?? wrapText(slide.body, 28, 4);
+  const headline = wrapText(slide.headline, 18, 2);
+  const startY = 220;
+  const rows = items.slice(0, 4).map((item, i) => listItemRow(startY + i * 88, i, item, p)).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="${SIZE}" height="${SIZE}" fill="#ffffff"/>
+  <rect x="0" y="0" width="${SIZE}" height="12" fill="${p.primary}"/>
+  <text x="${PAD}" y="120" font-family="${FONT}" font-size="22" fill="${p.bright}" font-weight="600">${slide.slide} / ${total}</text>
+  <text x="${PAD}" y="190" font-family="${FONT}" font-size="52" font-weight="800" fill="#1e293b" letter-spacing="-1">
+    ${tspans(headline, PAD, 58)}
+  </text>
+  ${rows}
+  ${progressBar(slide.slide, total, p.bright)}
+</svg>`;
+}
+
+function stepsSlide(slide: CarouselSlide, total: number, p: Palette): string {
+  const items = slide.items ?? [];
+  const headline = wrapText(slide.headline, 18, 2);
+  const body = slide.body ? wrapText(slide.body, 30, 2) : [];
+  const stepW = Math.floor((SIZE - PAD * 2 - 40) / Math.max(items.length, 1));
+  const steps = items.slice(0, 3).map((item, i) => {
+    const x = PAD + i * (stepW + 20);
+    const short = item.length > 22 ? `${item.slice(0, 20)}…` : item;
+    return `
+  <circle cx="${x + stepW / 2}" cy="380" r="36" fill="${p.primary}"/>
+  <text x="${x + stepW / 2}" y="392" text-anchor="middle" font-family="${FONT}" font-size="28" fill="#ffffff" font-weight="700">${i + 1}</text>
+  <text x="${x + stepW / 2}" y="460" text-anchor="middle" font-family="${FONT}" font-size="22" fill="#475569" font-weight="600">${escapeXml(short)}</text>
+  ${i < items.length - 1 ? `<line x1="${x + stepW + 4}" y1="380" x2="${x + stepW + 16}" y2="380" stroke="${p.light}" stroke-width="3" stroke-dasharray="6 6"/>` : ''}`;
+  }).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="stepsBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f8fafc"/>
+      <stop offset="100%" style="stop-color:#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="${SIZE}" height="${SIZE}" fill="url(#stepsBg)"/>
+  <text x="${PAD}" y="120" font-family="${FONT}" font-size="22" fill="${p.bright}" font-weight="600">${slide.slide} / ${total}</text>
+  <text x="${PAD}" y="200" font-family="${FONT}" font-size="48" font-weight="800" fill="#1e293b" letter-spacing="-1">
+    ${tspans(headline, PAD, 54)}
+  </text>
+  ${body.length > 0 ? `<text x="${PAD}" y="270" font-family="${FONT}" font-size="28" fill="#64748b">${tspans(body, PAD, 36)}</text>` : ''}
+  ${steps}
+  ${progressBar(slide.slide, total, p.bright)}
+</svg>`;
+}
+
+function statSlide(slide: CarouselSlide, total: number, p: Palette): string {
+  const stat = slide.stat ?? '—';
+  const statSize = stat.length > 5 ? 100 : 140;
+  const body = wrapText(slide.body, 28, 3);
+  const headline = wrapText(slide.headline, 16, 1);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="${SIZE}" height="${SIZE}" fill="${p.navy}"/>
+  <circle cx="900" cy="180" r="200" fill="${p.primary}" opacity="0.2"/>
+  <text x="${PAD}" y="140" font-family="${FONT}" font-size="22" fill="${p.light}" font-weight="600">${slide.slide} / ${total}</text>
+  <text x="${PAD}" y="200" font-family="${FONT}" font-size="24" fill="${p.light}" font-weight="700" letter-spacing="2">${tspans(headline, PAD, 30)}</text>
+  <text x="${PAD}" y="480" font-family="${FONT}" font-size="${statSize}" font-weight="800" fill="#ffffff" letter-spacing="-3">${escapeXml(stat)}</text>
+  <text x="${PAD}" y="580" font-family="${FONT}" font-size="34" fill="${p.light}" font-weight="400">
+    ${tspans(body, PAD, 44)}
+  </text>
+  ${progressBar(slide.slide, total, p.bright)}
+</svg>`;
+}
+
 function progressBar(current: number, total: number, color: string): string {
   const barW = SIZE - PAD * 2;
   const fillW = Math.round((current / total) * barW);
@@ -79,6 +158,10 @@ function coverSlide(slide: CarouselSlide, total: number, p: Palette): string {
   const headline = wrapText(slide.headline, 20, 4);
   const badge = slide.badge ?? 'LINKEDIN';
   const badgeW = Math.max(160, badge.length * 11 + 48);
+  const statBadge = slide.stat
+    ? `<rect x="${SIZE - PAD - 200}" y="${PAD}" width="200" height="72" rx="16" fill="${p.primary}" opacity="0.9"/>
+  <text x="${SIZE - PAD - 100}" y="${PAD + 48}" text-anchor="middle" font-family="${FONT}" font-size="36" fill="#ffffff" font-weight="800">${escapeXml(slide.stat)}</text>`
+    : '';
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -92,6 +175,7 @@ function coverSlide(slide: CarouselSlide, total: number, p: Palette): string {
   <circle cx="120" cy="920" r="100" fill="${p.light}" opacity="0.1"/>
   <rect x="${PAD}" y="${PAD}" width="${badgeW}" height="36" rx="18" fill="${p.primary}" opacity="0.35"/>
   <text x="${PAD + 20}" y="${PAD + 24}" font-family="${FONT}" font-size="17" fill="${p.light}" font-weight="600">${escapeXml(badge)}</text>
+  ${statBadge}
   <text x="${PAD}" y="480" font-family="${FONT}" font-size="60" font-weight="800" fill="#ffffff" letter-spacing="-1">
     ${tspans(headline, PAD, 70)}
   </text>
@@ -123,23 +207,31 @@ function problemSlide(slide: CarouselSlide, total: number, p: Palette): string {
 }
 
 function pointSlide(slide: CarouselSlide, total: number, p: Palette): string {
-  const body = wrapText(slide.body, 32, 6);
+  const hasBody = slide.body.trim().length > 0;
+  const body = hasBody ? wrapText(slide.body, 24, 4) : [];
+  const headlineSize = hasBody ? 48 : 56;
+  const headlineLines = hasBody ? 3 : 4;
   const num = slide.slide;
+  const toolNum = slide.stat;
   const bg = num % 2 === 0 ? '#f8fafc' : '#ffffff';
+  const numLabel = toolNum
+    ? `<text x="${PAD + 28}" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="#ffffff" font-weight="700">${escapeXml(toolNum)}</text>`
+    : `<text x="${PAD + 28}" y="130" text-anchor="middle" font-family="${FONT}" font-size="28" fill="#ffffff" font-weight="700">${num}</text>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg">
   <rect width="${SIZE}" height="${SIZE}" fill="${bg}"/>
   <rect x="0" y="0" width="${SIZE}" height="12" fill="${p.primary}"/>
   <circle cx="${PAD + 28}" cy="120" r="28" fill="${p.primary}"/>
-  <text x="${PAD + 28}" y="130" text-anchor="middle" font-family="${FONT}" font-size="28" fill="#ffffff" font-weight="700">${num}</text>
+  ${numLabel}
   <text x="${PAD}" y="200" font-family="${FONT}" font-size="22" fill="${p.bright}" font-weight="600">${num} / ${total}</text>
-  <text x="${PAD}" y="300" font-family="${FONT}" font-size="48" font-weight="800" fill="#1e293b" letter-spacing="-1">
-    ${tspans(wrapText(slide.headline, 22, 3), PAD, 54)}
+  <text x="${PAD}" y="${hasBody ? 300 : 360}" font-family="${FONT}" font-size="${headlineSize}" font-weight="800" fill="#1e293b" letter-spacing="-1">
+    ${tspans(wrapText(slide.headline, hasBody ? 22 : 18, headlineLines), PAD, headlineSize + 6)}
   </text>
-  <text x="${PAD}" y="440" font-family="${FONT}" font-size="32" fill="#64748b" font-weight="400">
-    ${tspans(body, PAD, 44)}
-  </text>
-  <rect x="${SIZE - 160}" y="140" width="80" height="80" rx="16" fill="${p.primary}" opacity="0.12"/>
+  ${hasBody ? `<text x="${PAD}" y="440" font-family="${FONT}" font-size="30" fill="#64748b" font-weight="400">
+    ${tspans(body, PAD, 40)}
+  </text>` : ''}
+  <rect x="${SIZE - 120}" y="140" width="40" height="120" rx="8" fill="${p.primary}" opacity="0.1"/>
+  <rect x="${SIZE - 100}" y="160" width="40" height="80" rx="8" fill="${p.primary}" opacity="0.18"/>
   ${progressBar(num, total, p.bright)}
 </svg>`;
 }
@@ -174,6 +266,9 @@ function slideSvg(slide: CarouselSlide, total: number, p: Palette): string {
   switch (kind) {
     case 'cover': return coverSlide(slide, total, p);
     case 'problem': return problemSlide(slide, total, p);
+    case 'stat': return statSlide(slide, total, p);
+    case 'list': return listSlide(slide, total, p);
+    case 'steps': return stepsSlide(slide, total, p);
     case 'cta': return ctaSlide(slide, total, p);
     default: return pointSlide(slide, total, p);
   }

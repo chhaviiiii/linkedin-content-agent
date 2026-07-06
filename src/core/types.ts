@@ -53,6 +53,10 @@ export interface LinkedInAuth {
   jsessionid: string;
 }
 
+export interface ClientOptions {
+  onAuthUpdate?: (patch: Partial<LinkedInAuth>) => void;
+}
+
 export interface LinkedInClient {
   request<T = unknown>(options: {
     method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
@@ -67,4 +71,6 @@ export interface LinkedInClient {
   patch<T = unknown>(path: string, body?: unknown): Promise<T>;
   put<T = unknown>(path: string, body?: unknown): Promise<T>;
   delete<T = unknown>(path: string, query?: Record<string, any>): Promise<T>;
+  /** Fetch a linkedin.com HTML page using session cookies (activity page, etc.) */
+  fetchPage(path: string): Promise<string>;
 }
