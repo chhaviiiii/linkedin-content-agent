@@ -3,3 +3,4 @@ dist/
 *.tsbuildinfo
 .DS_Store
 my-posts.txt
+my-post.txt

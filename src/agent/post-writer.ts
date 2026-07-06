@@ -52,11 +52,72 @@ ${cta[goal]}
 Building in public. Drop a 🔥 if you want early access.`.trim();
 }
 
+export function isPersonalTopic(topic: TrendTopic): boolean {
+  const t = `${topic.title} ${topic.keywords.join(' ')}`.toLowerCase();
+  return /roblox|game dev|weekend|side project|hobby|for fun|outside your day job|learning in public|mess(ing)? around|studio/.test(t);
+}
+
+export function isCareerTopic(topic: TrendTopic): boolean {
+  const t = `${topic.title} ${topic.keywords.join(' ')}`.toLowerCase();
+  return /intern|internship|mastercard|payments|new grad|job search|career|recruiting|offer/.test(t);
+}
+
+/** Story posts — no employer name-drops unless the topic is career-related. */
+export function writePersonalPost(topic: TrendTopic, goal: EngagementGoal): string {
+  const t = topic.title.toLowerCase();
+
+  if (t.includes('roblox') || t.includes('game')) {
+    return `I've been building in Roblox Studio on weekends.
+
+The feedback loop is instant: change a script, hit play, see if it feels right. That part has been teaching me more than I expected.
+
+What transferred from software engineering:
+
+→ Event-driven logic (touch part → script runs → feels like callbacks)
+→ Debugging when nothing errors but the game is still broken
+→ Reading docs instead of guessing
+
+What didn't:
+
+→ No types. My Lua brain misses TypeScript constantly.
+→ Game feel is its own skill. You can't LeetCode "fun."
+→ Scope creep when every idea takes 10 minutes to start
+
+Early days — but the learning curve is the interesting part.
+
+${personalCta(goal)}`.trim();
+  }
+
+  return `I've been exploring ${topic.title.toLowerCase()} on the side lately.
+
+Not as a pivot. As a place to learn without a deadline attached.
+
+What surprised me:
+
+→ The debugging is familiar, the constraints are different
+→ Small wins feel bigger when you're building for yourself
+→ You notice how much you rely on tooling you've taken for granted
+
+Still early. No polished launch story — just showing up and building.
+
+${personalCta(goal)}`.trim();
+}
+
+function personalCta(goal: EngagementGoal): string {
+  const ctas: Record<EngagementGoal, string> = {
+    comments: 'What are you building outside your day job right now?',
+    saves: 'Save this if you have a side project in progress too.',
+    reach: 'Know someone learning on the side? Send this their way.',
+    profile_visits: 'I post more about what I build — follow if that’s your thing.',
+  };
+  return ctas[goal];
+}
+
 export function writePost(input: WriterInput): string {
   const { topic, formula, goal, product = DEFAULT_PRODUCT } = input;
   const hook = buildHook(topic, formula);
   const body = buildBody(topic, product, goal);
-  const cta = buildCta(goal, product);
+  const cta = buildCta(goal, product, topic);
 
   return [hook, '', body, '', cta].join('\n').trim();
 }
@@ -82,8 +143,13 @@ function buildHook(topic: TrendTopic, formula: HookFormula): string {
       return `Nobody talks about ${a} when it comes to ${t.toLowerCase()}.`;
     case 8:
       return `Last month I published a post that got 12 likes.\nIt read exactly like ChatGPT.\nThe fix was ${a}.`;
-    case 9:
-      return `Myth: ${t} is about posting more.\nReality: ${a}.`;
+    case 9: {
+      if (/roblox|game/i.test(t)) {
+        return `Myth: you need to be a "game dev" to learn from Roblox Studio.\nReality: it's one of the fastest ways to remember how much you don't know — in a good way.`;
+      }
+      const short = t.length > 50 ? t.split(/[.—–-]/)[0]!.trim() : t;
+      return `Myth: ${short} takes a special talent.\nReality: it mostly takes showing up and finishing small loops.`;
+    }
     case 10:
       return `4 tools that fix ${t.toLowerCase()} (most people skip #3):`;
     case 11:
@@ -137,10 +203,6 @@ function buildBody(topic: TrendTopic, product: ProductContext, goal: EngagementG
   };
 
   return [
-    topic.angle.charAt(0).toUpperCase() + topic.angle.slice(1) + '.',
-    '',
-    'What actually moves the needle:',
-    '',
     insights.map((i) => `→ ${i}`).join('\n'),
     '',
     goalLine[goal],
@@ -173,6 +235,22 @@ function topicInsights(topic: TrendTopic): string[] {
       'What works on TikTok often works on LinkedIn',
     ];
   }
+  if (t.includes('roblox') || t.includes('game dev') || t.includes('game')) {
+    return [
+      'Event-driven logic maps surprisingly well to how scripts fire on player actions',
+      'Debugging when nothing errors but the game still breaks',
+      'Scope creep hits faster when features feel cheap to add',
+      'Game feel is a skill — not something you inherit from SWE experience',
+    ];
+  }
+  if (t.includes('intern') || t.includes('mastercard') || t.includes('payments')) {
+    return [
+      'Ask who uses the system daily before you optimize',
+      'Your first solution is probably over-engineered',
+      'Small fixes that unblock people beat clever architecture',
+      'Write the doc your teammate will read at 11pm',
+    ];
+  }
   if (t.includes('authentic')) {
     return [
       'Imperfect beats polished in 2026',
@@ -189,8 +267,25 @@ function topicInsights(topic: TrendTopic): string[] {
   ];
 }
 
-function buildCta(goal: EngagementGoal, product: ProductContext): string {
-  if (goal === 'comments') return product.cta;
-  if (goal === 'saves') return 'Save this for your next draft. ' + product.cta;
-  return 'Building in public. ' + product.cta;
+function buildCta(goal: EngagementGoal, product: ProductContext, topic: TrendTopic): string {
+  const isToolkit = topic.title.toLowerCase().includes('ai content') ||
+    topic.keywords.some((k) => /toolkit|humanizer|post writer/i.test(k));
+
+  if (isToolkit) {
+    if (goal === 'comments') return product.cta;
+    if (goal === 'saves') return 'Save this for your next draft. ' + product.cta;
+    return 'Building in public. ' + product.cta;
+  }
+
+  const ctas: Record<EngagementGoal, string> = {
+    comments: isPersonalTopic(topic)
+      ? personalCta('comments')
+      : isCareerTopic(topic)
+        ? 'What do you wish you knew earlier in your career?'
+        : 'Agree or disagree? Tell me below.',
+    saves: isPersonalTopic(topic) ? personalCta('saves') : 'Save this before your next post.',
+    reach: isPersonalTopic(topic) ? personalCta('reach') : 'Repost if your network needs this.',
+    profile_visits: isPersonalTopic(topic) ? personalCta('profile_visits') : 'Follow for more breakdowns like this.',
+  };
+  return ctas[goal];
 }

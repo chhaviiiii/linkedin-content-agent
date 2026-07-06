@@ -43,7 +43,9 @@ describe('hook-extractor', () => {
     expect(result.formula_name).toBe('Nobody talks about');
   });
 });
+import { generateHashtags, buildCopyPastePost, formatDraftMarkdown } from '../src/agent/draft-markdown.js';
 import { pickHookFormula, HOOK_FORMULAS } from '../src/agent/hook-formulas.js';
+import { writePersonalPost, isPersonalTopic } from '../src/agent/post-writer.js';
 import { buildCarousel } from '../src/agent/media-builder.js';
 import type { TrendTopic } from '../src/agent/types.js';
 
@@ -174,6 +176,85 @@ CourseInsights is an automated analytics platform designed to streamline the pro
     };
     const result = applyVoice('Long paragraph that should get some formatting applied to match voice.', profile);
     expect(result).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
+  });
+});
+
+describe('draft-markdown', () => {
+  const topic = {
+    title: 'SWE internship at Mastercard',
+    angle: 'lessons',
+    platform: 'linkedin' as const,
+    keywords: ['SWE', 'internship', 'Mastercard'],
+    score: 80,
+    source: 'manual',
+  };
+
+  it('generates up to 3 hashtags', () => {
+    const tags = generateHashtags(topic, 'comments');
+    expect(tags.length).toBeLessThanOrEqual(3);
+    expect(tags.every((t) => t.startsWith('#'))).toBe(true);
+  });
+
+  it('appends hashtags to post body in markdown', () => {
+    const draft = {
+      id: 'draft_test',
+      created_at: new Date().toISOString(),
+      topic,
+      goal: 'comments' as const,
+      hook_formula: pickHookFormula('comments'),
+      raw_text: 'Hello world',
+      humanized_text: 'I shipped my first feature this week.',
+      audit: { score: 90, passed: true, issues: [] },
+      carousel: [],
+      video: { duration_sec: 30, hook: '', scenes: [], cta: '' },
+      media_notes: [],
+      images: [],
+      format: 'text' as const,
+      image_idea: { why: '', photo_suggestions: [], fallback: '' },
+      status: 'draft' as const,
+    };
+    const md = formatDraftMarkdown(draft);
+    expect(md).toContain('I shipped my first feature this week.');
+    expect(md).toMatch(/#\w+/);
+    expect(buildCopyPastePost(draft)).toMatch(/#\w+/);
+  });
+
+  it('does not treat #1 in body as an existing hashtag', () => {
+    const draft = {
+      id: 'draft_test',
+      created_at: new Date().toISOString(),
+      topic,
+      goal: 'comments' as const,
+      hook_formula: pickHookFormula('comments'),
+      raw_text: 'Hello',
+      humanized_text: 'The #1 killer was bad hooks.',
+      audit: { score: 90, passed: true, issues: [] },
+      carousel: [],
+      video: { duration_sec: 30, hook: '', scenes: [], cta: '' },
+      media_notes: [],
+      images: [],
+      format: 'text' as const,
+      image_idea: { why: '', photo_suggestions: [], fallback: '' },
+      status: 'draft' as const,
+    };
+    expect(buildCopyPastePost(draft)).toMatch(/#Swe|#SWE|#Internship/i);
+  });
+});
+
+describe('post-writer personal', () => {
+  it('writes Roblox post without employer name-drops', () => {
+    const topic = {
+      title: 'Roblox Studio weekends',
+      angle: 'side project',
+      platform: 'linkedin' as const,
+      keywords: ['roblox', 'studio'],
+      score: 80,
+      source: 'manual',
+    };
+    expect(isPersonalTopic(topic)).toBe(true);
+    const post = writePersonalPost(topic, 'comments');
+    expect(post).not.toMatch(/mastercard/i);
+    expect(post).toContain('What are you building outside your day job');
   });
 });
 

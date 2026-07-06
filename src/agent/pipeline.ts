@@ -2,7 +2,7 @@ import type { LinkedInClient } from '../core/types.js';
 import { pickHookFormula, getHookFormulaById } from './hook-formulas.js';
 import { humanize } from './humanizer.js';
 import { auditPost } from './post-audit.js';
-import { writePost, writeToolkitPost } from './post-writer.js';
+import { writePost, writeToolkitPost, writePersonalPost, isPersonalTopic } from './post-writer.js';
 import { scoutTrends, pickBestTopic, type ScoutOptions } from './trend-scout.js';
 import { buildCarousel, buildVideoScript, mediaNotes } from './media-builder.js';
 import { saveDraft, generateDraftId } from './drafts.js';
@@ -68,35 +68,44 @@ export async function runPipeline(options: PipelineOptions = {}): Promise<Pipeli
     else {
       topic = {
         title: options.topic,
-        angle: `a fresh angle on ${options.topic} for your audience`,
+        angle: options.topic,
         platform: 'linkedin',
-        keywords: options.topic.split(/\s+/),
+        keywords: options.topic.split(/\s+/).filter((w) => w.length > 2),
         score: 80,
         source: 'manual',
       };
     }
   }
 
-  const formula = options.hook_id
-    ? getHookFormulaById(options.hook_id) ?? pickHookFormula(goal)
-    : pickHookFormula(goal);
+  const userProvidedText = Boolean(options.text?.trim());
+  const formula = userProvidedText
+    ? getHookFormulaById(1) ?? pickHookFormula(goal)
+    : options.hook_id
+      ? getHookFormulaById(options.hook_id) ?? pickHookFormula(goal)
+      : pickHookFormula(goal);
 
   let rawText: string;
   if (options.text) {
-    rawText = options.text;
+    rawText = options.text.trim();
   } else if (topic.title.toLowerCase().includes('ai content')) {
     rawText = writeToolkitPost(goal);
+  } else if (isPersonalTopic(topic)) {
+    rawText = writePersonalPost(topic, goal);
   } else {
     rawText = writePost({ topic, formula, goal });
   }
 
-  const isToolkitTemplate = !options.text && topic.title.toLowerCase().includes('ai content');
-  let humanizedText = isToolkitTemplate ? rawText : humanize(rawText).text;
+  const isToolkitTemplate = !userProvidedText && topic.title.toLowerCase().includes('ai content');
+  let humanizedText = userProvidedText
+    ? rawText
+    : isToolkitTemplate
+      ? rawText
+      : humanize(rawText).text;
 
   const voice = options.voice_username
     ? await loadVoiceProfile(options.voice_username)
     : await loadVoiceProfile();
-  if (voice) {
+  if (voice && !userProvidedText) {
     humanizedText = applyVoice(humanizedText, voice);
   }
 
@@ -146,6 +155,6 @@ export async function runPipeline(options: PipelineOptions = {}): Promise<Pipeli
     status: 'draft',
   };
 
-  const saved_to = await saveDraft(draft);
-  return { draft, saved_to };
+  const saved = await saveDraft(draft);
+  return { draft, saved_to: saved.markdown };
 }

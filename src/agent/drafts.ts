@@ -2,6 +2,7 @@ import { mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import type { ContentDraft } from './types.js';
+import { formatDraftMarkdown } from './draft-markdown.js';
 
 const DRAFTS_DIR = join(homedir(), '.linkedin-cli', 'drafts');
 
@@ -14,12 +15,37 @@ export function getDraftDir(draftId: string): string {
   return join(DRAFTS_DIR, draftId);
 }
 
-export async function saveDraft(draft: ContentDraft): Promise<string> {
+export interface SavedDraftPaths {
+  dir: string;
+  json: string;
+  markdown: string;
+}
+
+export async function saveDraft(draft: ContentDraft): Promise<SavedDraftPaths> {
   const dir = getDraftDir(draft.id);
   await mkdir(dir, { recursive: true });
-  const filePath = join(dir, 'draft.json');
-  await writeFile(filePath, JSON.stringify(draft, null, 2), 'utf-8');
-  return filePath;
+  const json = join(dir, 'draft.json');
+  const markdown = join(dir, 'post.md');
+  await writeFile(json, JSON.stringify(draft, null, 2), 'utf-8');
+  await writeFile(markdown, formatDraftMarkdown(draft), 'utf-8');
+  return { dir, json, markdown };
+}
+
+export async function exportDraftMarkdown(id: string): Promise<string | null> {
+  const draft = await loadDraft(id);
+  if (!draft) return null;
+  const { markdown } = await saveDraft(draft);
+  return markdown;
+}
+
+export async function exportAllDraftMarkdown(): Promise<Array<{ id: string; markdown: string }>> {
+  const drafts = await listDrafts();
+  const results: Array<{ id: string; markdown: string }> = [];
+  for (const { id } of drafts) {
+    const path = await exportDraftMarkdown(id);
+    if (path) results.push({ id, markdown: path });
+  }
+  return results;
 }
 
 export async function listDrafts(): Promise<Array<{ id: string; created_at: string; topic: string }>> {

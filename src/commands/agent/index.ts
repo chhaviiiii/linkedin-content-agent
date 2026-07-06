@@ -7,7 +7,8 @@ import { scoutTrends } from '../../agent/trend-scout.js';
 import { humanize } from '../../agent/humanizer.js';
 import { auditPost } from '../../agent/post-audit.js';
 import { extractHook } from '../../agent/hook-extractor.js';
-import { listDrafts, loadDraft, saveDraft } from '../../agent/drafts.js';
+import { listDrafts, loadDraft, saveDraft, exportDraftMarkdown, exportAllDraftMarkdown, getDraftDir } from '../../agent/drafts.js';
+import { buildCopyPastePost } from '../../agent/draft-markdown.js';
 import { HOOK_FORMULAS } from '../../agent/hook-formulas.js';
 import { regenerateImagesForDraft, generateCoverOnly } from '../../agent/image-generator.js';
 import { buildCarousel } from '../../agent/media-builder.js';
@@ -84,6 +85,7 @@ export function registerAgentCommands(program: Command): void {
           message: 'Draft created (not published)',
           id: result.draft.id,
           saved_to: result.saved_to,
+          post_md: result.saved_to,
           topic: result.draft.topic.title,
           goal: result.draft.goal,
           format: result.draft.format,
@@ -276,7 +278,30 @@ export function registerAgentCommands(program: Command): void {
       const globalOpts = this.optsWithGlobals() as GlobalOptions;
       try {
         const drafts = await listDrafts();
-        output({ drafts, dir: '~/.linkedin-cli/drafts/' }, globalOpts);
+        output({ drafts, dir: '~/.linkedin-cli/drafts/', post_file: 'post.md in each draft folder' }, globalOpts);
+      } catch (error) {
+        outputError(error, globalOpts);
+      }
+    });
+
+  agent
+    .command('export')
+    .description('Write or refresh post.md (copy-paste post + hashtags) for saved drafts')
+    .option('--id <draft-id>', 'Single draft ID')
+    .option('--all', 'All saved drafts')
+    .action(async function (this: Command) {
+      const opts = this.opts() as { id?: string; all?: boolean };
+      const globalOpts = this.optsWithGlobals() as GlobalOptions;
+      try {
+        if (opts.all) {
+          const results = await exportAllDraftMarkdown();
+          output({ message: `Exported ${results.length} post.md file(s)`, results }, globalOpts);
+          return;
+        }
+        if (!opts.id) throw new Error('Pass --id <draft-id> or --all');
+        const path = await exportDraftMarkdown(opts.id);
+        if (!path) throw new Error(`Draft not found: ${opts.id}`);
+        output({ message: 'post.md written', id: opts.id, post_md: path }, globalOpts);
       } catch (error) {
         outputError(error, globalOpts);
       }
@@ -291,7 +316,11 @@ export function registerAgentCommands(program: Command): void {
       try {
         const draft = await loadDraft(draftId);
         if (!draft) throw new Error(`Draft not found: ${draftId}`);
-        output(draft, globalOpts);
+        output({
+          ...draft,
+          post_md: `${getDraftDir(draftId)}/post.md`,
+          copy_paste_post: buildCopyPastePost(draft),
+        }, globalOpts);
       } catch (error) {
         outputError(error, globalOpts);
       }
@@ -385,6 +414,7 @@ Examples:
   $ linkedin agent images --all
   $ linkedin agent images --id "draft_20260706012708_abc1"
   $ linkedin agent drafts
+  $ linkedin agent export --all
   $ linkedin agent show draft_20260706012708_abc1
 
 No login required for drafting, images, audit, or humanize.

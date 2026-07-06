@@ -67,7 +67,7 @@ linkedin agent plan --niche "your niche" --create --voice YOUR_USERNAME --pretty
 | `agent scout` | No | Trend topics |
 | `agent humanize` | No | Strip AI fingerprints |
 | `agent audit` | No | 2026 algo score |
-| `agent drafts` / `show` | No | Review saved drafts |
+| `agent drafts` / `show` | No | Review saved drafts (`post.md` = copy-paste + hashtags) |
 | `agent images` | No | Regenerate images |
 
 \* LinkedIn often blocks automated fetches (authwall). `--from-file` with your About section always works offline.
@@ -86,6 +86,8 @@ linkedin agent plan --niche "your niche" --create --voice YOUR_USERNAME --pretty
 ```bash
 linkedin agent voice --url https://linkedin.com/in/YOUR_USERNAME
 linkedin agent run --topic "..." --goal saves --format carousel --voice YOUR_USERNAME
+linkedin agent run --from-file ./my-post.txt --goal comments --format single
+linkedin agent export --all
 ```
 
 ## MCP (for coding agents)

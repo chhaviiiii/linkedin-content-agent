@@ -6,7 +6,7 @@ This repo is a **LinkedIn content agent** + optional LinkedIn CLI. Your job as a
 
 1. **Never publish without explicit user approval**
 2. **No login required** for `linkedin agent` commands
-3. Drafts live in `~/.linkedin-cli/drafts/<draft-id>/`
+3. Drafts save to `~/.linkedin-cli/drafts/<draft-id>/` as **`post.md`** (copy-paste post + hashtags) and `draft.json` (metadata).
 4. Use `--format auto` unless the user specifies carousel/single/text
 5. Personal posts → `--format single --photo <path>` when user has a photo
 
@@ -15,7 +15,7 @@ This repo is a **LinkedIn content agent** + optional LinkedIn CLI. Your job as a
 ```
 1. linkedin agent scout --keywords "..." --pretty     # pick topic
 2. linkedin agent run --topic "..." --goal saves     # create draft
-3. linkedin agent show <draft-id> --pretty           # review
+3. open ~/.linkedin-cli/drafts/<draft-id>/post.md   # copy-paste into LinkedIn
 4. linkedin agent audit --text "..."                 # optional re-check
 5. User approves → linkedin posts create ...         # only if user asks
 ```
@@ -50,7 +50,7 @@ cp my-posts.example.txt my-posts.txt
 linkedin agent voice --url https://linkedin.com/in/YOUR_USERNAME --from-file ./my-posts.txt
 ```
 
-Voice profiles save to `~/.linkedin-cli/voice/<username>.json`. Use `--voice YOUR_USERNAME` on `agent run` and `agent plan`.
+For personal posts, write your own text in a file and use `--from-file` (skips auto-generation and voice reshaping).
 
 ## Content agent commands
 
