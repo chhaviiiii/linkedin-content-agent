@@ -5,6 +5,7 @@ import { createClient } from '../core/client.js';
 import { output, outputError } from '../core/output.js';
 import { registerLoginCommand, registerLogoutCommand, registerStatusCommand } from './auth/login.js';
 import { registerMcpCommand } from './mcp/index.js';
+import { registerAgentCommands } from './agent/index.js';
 
 // Import all command groups
 import { profileCommands } from './profile/view.js';
@@ -37,6 +38,7 @@ export function registerAllCommands(program: Command): void {
   registerLogoutCommand(program);
   registerStatusCommand(program);
   registerMcpCommand(program);
+  registerAgentCommands(program);
 
   // Group commands by their `group` field
   const groups = new Map<string, CommandDefinition[]>();

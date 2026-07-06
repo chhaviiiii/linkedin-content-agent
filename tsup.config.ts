@@ -15,5 +15,5 @@ export default defineConfig({
   banner: {
     js: '#!/usr/bin/env node',
   },
-  external: ['@inquirer/prompts'],
+  external: ['@inquirer/prompts', 'sharp'],
 });
