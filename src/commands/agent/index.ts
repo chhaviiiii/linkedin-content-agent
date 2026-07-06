@@ -291,10 +291,9 @@ Examples:
   $ linkedin agent scout --keywords "AI content"            # curated trends, offline
   $ linkedin agent scout --keywords "AI" --live             # live LinkedIn (needs login)
   $ linkedin agent images --all
-  $ linkedin agent images --id "draft-2026-07-06T01-22-39-d2be"
-  $ linkedin agent images -- draft-2026-07-06T01-22-39-d2be
+  $ linkedin agent images --id "draft_20260706012708_abc1"
   $ linkedin agent drafts
-  $ linkedin agent show draft-2026-07-06T01-00-00-abc1
+  $ linkedin agent show draft_20260706012708_abc1
 
 No login required for drafting, images, audit, or humanize.
 Publishing is separate (optional): linkedin login && linkedin posts create ...

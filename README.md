@@ -1,293 +1,104 @@
-# linkedincli
+# LinkedIn Content Agent
 
-Full LinkedIn platform management from your terminal. 43 API commands plus a **content agent** that drafts posts, audits copy, and generates carousel images — no login required for drafting.
+Plan, write, audit, and image-gen LinkedIn posts from your terminal. **No login required** for drafting.
 
-Works as a **CLI** and an **MCP server** (for Claude Code, Cursor, Windsurf, and other AI agents).
+Optional: publish to LinkedIn via cookie auth when you're ready.
+
+```
+Scout trends → Write post → Humanize → Audit → Generate images → Save draft → You approve → Publish
+```
 
 ## Install
 
 ```bash
-# Install globally
-npm install -g @bcharleson/linkedincli
-
-# This installs the `linkedin` command:
-linkedin --help
-
-# Or run from source
-git clone https://github.com/bcharleson/linkedincli.git
-cd linkedincli && npm install && npm run build
-node dist/index.js --help
+git clone https://github.com/chhaviiiii/linkedin-content-agent.git
+cd linkedin-content-agent
+npm install && npm run build
+npm link   # optional: use `linkedin` globally
 ```
 
-> **Note:** The npm package is `@bcharleson/linkedincli` but the CLI command is just **`linkedin`**.
-
-## Content Agent (no login required)
-
-The content agent scouts trends, writes posts, humanizes copy, audits against 2026 algorithm rules, and generates **1080×1080 carousel PNGs**. It never auto-publishes.
+## Quick start
 
 ```bash
-# Full pipeline: topic → draft → audit → 7 slide images + cover
+# Create a full draft (text + audit + images). Never auto-publishes.
 linkedin agent run --topic "AI content" --goal saves --pretty
 
-# Use your own post text
-linkedin agent run --from-file ./my-post.txt --pretty
+# Your own post text
+linkedin agent run --from-file ./post.txt --format single --photo ./me.jpg --pretty
 
-# Individual tools
-linkedin agent scout --keywords "content creation" --pretty
-linkedin agent humanize --text "I'm thrilled to delve into this robust landscape"
-linkedin agent audit --text "Your draft here"
-linkedin agent extract-hook --text "Nobody talks about hooks when..."
-linkedin agent hooks --pretty
-
-# Review saved drafts
+# List drafts
 linkedin agent drafts --pretty
 linkedin agent show <draft-id> --pretty
-linkedin agent images <draft-id>   # regenerate images
+open ~/.linkedin-cli/drafts/<draft-id>/images/
 ```
 
-Drafts save to `~/.linkedin-cli/drafts/<id>/`:
-- `draft.json` — post text, audit score, carousel copy, video script
-- `images/slide-01.png` … `slide-07.png` — carousel slides
-- `images/cover.png` — use for single-image posts
+## Agent commands
 
-**Optional:** pass `--live` to pull live LinkedIn trend data (requires login). Without `--live`, scouting uses curated cross-platform trends and works fully offline.
+| Command | Login? | What it does |
+|---------|--------|--------------|
+| `agent run` | No | Full pipeline: topic → draft → audit → images |
+| `agent scout` | No* | Trend topics (curated; `--live` needs login) |
+| `agent humanize` | No | Strip AI fingerprints |
+| `agent audit` | No | Score against 2026 algo rules |
+| `agent extract-hook` | No | Reverse-engineer viral hooks |
+| `agent hooks` | No | List 16 hook formulas |
+| `agent drafts` | No | List saved drafts |
+| `agent show <id>` | No | View a draft |
+| `agent images` | No | Regenerate images (`--all`, `--format`, `--photo`) |
+
+### Useful flags
 
 ```bash
-linkedin agent scout --keywords "AI content" --live --pretty
+--goal saves|comments|reach|profile_visits
+--format carousel|single|text|auto      # auto picks best format
+--photo ./your-photo.jpg                # attach your photo (best for personal posts)
+--from-file ./post.txt
+--no-images
 ```
 
-## LinkedIn API (login required)
+### Draft output
 
-Cookie session auth for profiles, posts, messaging, connections, search, and more.
+```
+~/.linkedin-cli/drafts/<draft-id>/
+  draft.json          # post text, audit, format, image ideas
+  images/
+    cover.png         # single-image posts
+    slide-01.png …    # carousel posts
+    your-photo.jpg    # if you passed --photo
+```
 
-### 1. Get your cookies
+## Publish (optional)
 
-Open LinkedIn in your browser → DevTools (`F12`) → Application → Cookies → `linkedin.com`
-
-Copy:
-- **`li_at`** — session token (starts with `AQED...`)
-- **`JSESSIONID`** — session ID (starts with `ajax:`)
-
-> **Note:** Using cookies in the CLI may log you out of your browser session. Copy fresh cookies when needed.
-
-### 2. Login
+Requires `linkedin login` with browser cookies. See [docs/publish.md](docs/publish.md).
 
 ```bash
 linkedin login
-# Paste li_at and JSESSIONID when prompted
+linkedin posts create --text "..." --image ~/.linkedin-cli/drafts/<id>/images/cover.png
 ```
 
-Or non-interactively:
+## For AI agents
 
-```bash
-linkedin login --li-at "AQEDxxxxxxx" --jsessionid "ajax:1234567890"
-```
+Read **[AGENTS.md](AGENTS.md)** — workflow, commands, and conventions for coding agents.
 
-### 3. Use it
+LinkedIn API reference (43 commands): **[docs/LINKEDIN-API.md](docs/LINKEDIN-API.md)**
 
-```bash
-linkedin profile me --pretty
-linkedin posts create --text "Hello LinkedIn!" --image ./photo.jpg
-linkedin search people --keywords "software engineer" --network F --pretty
-linkedin messaging conversations --pretty
-linkedin feed view --limit 20 --pretty
-```
+## MCP server
 
-### Publish an agent draft
-
-```bash
-linkedin posts create \
-  --text "Your post text here" \
-  --image ~/.linkedin-cli/drafts/<draft-id>/images/cover.png
-```
-
-For carousels, combine the slide PNGs into a PDF (Preview, Canva, etc.) and upload as a LinkedIn document post.
-
-## All Commands
-
-### Agent (no login)
-
-```bash
-linkedin agent run [--goal saves] [--topic "..."] [--from-file path] [--no-images] [--live]
-linkedin agent scout [--keywords "..."] [--platform linkedin|x|tiktok|all] [--live]
-linkedin agent humanize --text "..."
-linkedin agent audit [--text "..."] [--file path]
-linkedin agent extract-hook --text "..."
-linkedin agent hooks
-linkedin agent drafts
-linkedin agent show <draft-id>
-linkedin agent images <draft-id>
-```
-
-### Profile (9 commands)
-
-```bash
-linkedin profile me
-linkedin profile view <public-id>
-linkedin profile contact-info <public-id>
-linkedin profile skills <public-id> --limit 50
-linkedin profile network <public-id>
-linkedin profile badges <public-id>
-linkedin profile privacy <public-id>
-linkedin profile posts <urn-id> --limit 20
-linkedin profile disconnect <public-id>
-```
-
-### Posts (3 commands)
-
-```bash
-linkedin posts create --text "My post"
-linkedin posts create --text "With image" --image ./pic.jpg
-linkedin posts create --text "Inner circle" --visibility connections
-linkedin posts edit <share-urn> --text "Updated text"
-linkedin posts delete <share-urn>
-```
-
-### Feed (3 commands)
-
-```bash
-linkedin feed view
-linkedin feed view --limit 50
-linkedin feed user <profile-id> --limit 20
-linkedin feed company <company-name> --limit 20
-```
-
-### Engagement (5 commands)
-
-```bash
-linkedin engage react <post-urn> --type LIKE
-linkedin engage react <post-urn> --type PRAISE
-linkedin engage react <post-urn> --type EMPATHY
-linkedin engage react <post-urn> --type INTEREST
-linkedin engage react <post-urn> --type ENTERTAINMENT
-linkedin engage react <post-urn> --type APPRECIATION
-linkedin engage comment <post-urn> --text "Great post!"
-linkedin engage comments-list <post-urn> --limit 20
-linkedin engage reactions <post-urn> --limit 20
-linkedin engage share <share-urn> --text "Worth reading"
-```
-
-### Connections (7 commands)
-
-```bash
-linkedin connections send <profile-urn>
-linkedin connections send <profile-urn> -m "Let's connect!"
-linkedin connections received --limit 50
-linkedin connections sent --limit 50
-linkedin connections accept <id> --secret <secret>
-linkedin connections reject <id> --secret <secret>
-linkedin connections withdraw <id>
-linkedin connections remove <public-id>
-```
-
-### Messaging (6 commands)
-
-```bash
-linkedin messaging conversations
-linkedin messaging conversation-with <profile-urn>
-linkedin messaging messages <conversation-id>
-linkedin messaging send <conversation-id> -t "Hello!"
-linkedin messaging send-new -r <urn1>,<urn2> -t "Hi!"
-linkedin messaging mark-read <conversation-id>
-```
-
-### Search (4 commands)
-
-```bash
-linkedin search people --keywords "CTO" --network F
-linkedin search people --keywords "engineer" --company 1035
-linkedin search companies --keywords "AI startups" --limit 25
-linkedin search jobs --keywords "engineer" --remote --experience 4
-linkedin search posts --keywords "AI trends" --limit 25
-```
-
-### Companies (3 commands)
-
-```bash
-linkedin companies view <company-name>
-linkedin companies follow <following-state-urn>
-linkedin companies unfollow <entity-urn>
-```
-
-### Jobs (2 commands)
-
-```bash
-linkedin jobs view <job-id>
-linkedin jobs skills <job-id>
-```
-
-### Analytics (1 command)
-
-```bash
-linkedin analytics profile-views
-```
-
-## Global Options
-
-| Flag | Description |
-|------|-------------|
-| `--li-at <cookie>` | Override li_at cookie |
-| `--jsessionid <cookie>` | Override JSESSIONID cookie |
-| `--output pretty` | Pretty-printed JSON |
-| `--pretty` | Shorthand for `--output pretty` |
-| `--quiet` | No output, exit codes only |
-| `--fields <list>` | Comma-separated fields to include |
-| `--limit <n>` | Result count (replaces deprecated `--count`) |
-
-## Environment Variables
-
-```bash
-export LINKEDIN_LI_AT="your_li_at_cookie"
-export LINKEDIN_JSESSIONID="your_jsessionid_cookie"
-```
-
-Auth resolution order: `--li-at`/`--jsessionid` flags → env vars → `~/.linkedin-cli/config.json`
-
-## MCP Server (AI Agents)
-
-LinkedIn API commands are available as MCP tools. The content agent runs via CLI (`linkedin agent`).
+LinkedIn API tools via MCP (requires cookies). Content agent uses CLI.
 
 ```json
 {
   "mcpServers": {
     "linkedin": {
       "command": "linkedin",
-      "args": ["mcp"],
-      "env": {
-        "LINKEDIN_LI_AT": "your_li_at_cookie",
-        "LINKEDIN_JSESSIONID": "your_jsessionid_cookie"
-      }
+      "args": ["mcp"]
     }
   }
 }
-```
-
-Or with `npx`:
-
-```json
-{
-  "mcpServers": {
-    "linkedin": {
-      "command": "npx",
-      "args": ["-y", "@bcharleson/linkedincli", "mcp"]
-    }
-  }
-}
-```
-
-## Cookie Expiration
-
-LinkedIn `li_at` cookies expire periodically. When your session expires:
-
-```bash
-linkedin status --verify
-linkedin login
 ```
 
 ## Disclaimer
 
-This tool uses LinkedIn's internal Voyager API via cookie session authentication. It is not affiliated with or endorsed by LinkedIn. Use responsibly and in compliance with LinkedIn's terms of service. The authors are not responsible for any account restrictions that may result from automated usage.
+Not affiliated with LinkedIn. Cookie auth uses LinkedIn's internal API. Use responsibly.
 
-## License
-
-MIT
+MIT License.

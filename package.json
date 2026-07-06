@@ -1,7 +1,7 @@
 {
-  "name": "@bcharleson/linkedincli",
-  "version": "0.1.5",
-  "description": "CLI and MCP server for LinkedIn — 43 commands for profiles, posts, messaging, connections, search, feed, and more. Cookie session auth, AI agent native.",
+  "name": "linkedin-content-agent",
+  "version": "0.2.0",
+  "description": "LinkedIn content agent — scout trends, draft posts, humanize, audit, generate images. No login required. Optional LinkedIn CLI for publishing.",
   "type": "module",
   "bin": {
     "linkedin": "./dist/index.js"
@@ -10,6 +10,7 @@
     "dist/",
     "README.md",
     "AGENTS.md",
+    "docs/",
     "LICENSE"
   ],
   "scripts": {
@@ -18,7 +19,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/",
     "prepublishOnly": "npm run build"
   },
   "engines": {
@@ -26,11 +26,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bcharleson/linkedincli.git"
+    "url": "git+https://github.com/chhaviiiii/linkedin-content-agent.git"
   },
-  "homepage": "https://github.com/bcharleson/linkedincli#readme",
+  "homepage": "https://github.com/chhaviiiii/linkedin-content-agent#readme",
   "bugs": {
-    "url": "https://github.com/bcharleson/linkedincli/issues"
+    "url": "https://github.com/chhaviiiii/linkedin-content-agent/issues"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.3.0",
@@ -48,22 +48,15 @@
   },
   "keywords": [
     "linkedin",
+    "content-agent",
+    "ai-agent",
     "cli",
     "mcp",
-    "mcp-server",
-    "automation",
-    "voyager-api",
-    "agent",
-    "ai",
-    "linkedin-api",
-    "linkedin-automation",
-    "cookie-auth",
+    "carousel",
     "social-media",
-    "messaging",
-    "connections",
-    "posts",
-    "feed"
+    "post-writer",
+    "humanizer"
   ],
-  "author": "Brandon Charleson",
+  "author": "Chhavi Nayyar",
   "license": "MIT"
 }
